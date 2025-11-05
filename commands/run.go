@@ -2,6 +2,7 @@ package commands
 
 import (
 	"math"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,7 @@ var (
 	tor         string
 	headers     string
 	url         string
+	method      string
 )
 
 const defaultInterval = 10 * time.Second
@@ -38,6 +40,7 @@ func (*Run) SetFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&tor, "tor", "t", "", "TOR endpoint (either socks5://1.1.1.1:1234, or 1.1.1.1:1234).")
 	flags.StringVarP(&url, "url", "u", "", "Target URL to send the attack to.")
 	flags.StringVarP(&headers, "headers", "H", "", "HTTP headers in HEADER=VALUE format, separated by commas.")
+	flags.StringVarP(&method, "method", "m", http.MethodPost, "HTTP method to use when sending requests.")
 }
 
 // GetRequiredFlags returns the server required flags.
@@ -85,7 +88,7 @@ func (*Run) Run() RunCmd {
 					return
 				}
 
-				req := request.NewRequest(int64(isize), url, interval, parsedHeaders)
+				req := request.NewRequest(int64(isize), url, interval, parsedHeaders, method)
 				if tor != "" {
 					req.WithTor(tor)
 				}
