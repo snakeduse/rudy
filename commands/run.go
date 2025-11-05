@@ -2,6 +2,7 @@ package commands
 
 import (
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ var (
 	interval    time.Duration
 	size        string
 	tor         string
+	headers     string
+	method      string
 	url         string
 )
 
@@ -35,6 +38,8 @@ func (*Run) SetFlags(flags *pflag.FlagSet) {
 	flags.StringVarP(&size, "payload-size", "p", "1MB", "Random generated payload with the given size.")
 	flags.StringVarP(&tor, "tor", "t", "", "TOR endpoint (either socks5://1.1.1.1:1234, or 1.1.1.1:1234).")
 	flags.StringVarP(&url, "url", "u", "", "Target URL to send the attack to.")
+	flags.StringVarP(&headers, "headers", "H", "", "HTTP headers in HEADER=VALUE format, separated by commas.")
+	flags.StringVarP(&method, "method", "m", "POST", "HTTP method to use for the request.")
 }
 
 // GetRequiredFlags returns the server required flags.
@@ -74,13 +79,19 @@ func (*Run) Run() RunCmd {
 
 		waitgroup.Add(int(concurrents))
 
+		parsedHeaders := parseHeaders(headers)
+		requestMethod := strings.ToUpper(strings.TrimSpace(method))
+		if requestMethod == "" {
+			requestMethod = "POST"
+		}
+
 		for range concurrents {
 			go func() {
 				if isize > math.MaxInt64 {
 					return
 				}
 
-				req := request.NewRequest(int64(isize), url, interval)
+				req := request.NewRequest(int64(isize), url, requestMethod, interval, parsedHeaders)
 				if tor != "" {
 					req.WithTor(tor)
 				}
@@ -95,6 +106,38 @@ func (*Run) Run() RunCmd {
 
 		waitgroup.Wait()
 	}
+}
+
+func parseHeaders(raw string) map[string]string {
+	if raw == "" {
+		return nil
+	}
+
+	headersMap := make(map[string]string)
+
+	entries := strings.Split(raw, ",")
+	for _, entry := range entries {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+
+		parts := strings.SplitN(entry, "=", 2)
+		if len(parts) != 2 {
+			panic("invalid header format: " + entry)
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		if key == "" {
+			panic("header name cannot be empty")
+		}
+
+		headersMap[key] = value
+	}
+
+	return headersMap
 }
 
 func newRun() command {
