@@ -27,12 +27,16 @@ type Request interface {
 }
 
 // NewRequest creates the request.
-func NewRequest(size int64, u string, delay time.Duration) Request {
+func NewRequest(size int64, u string, delay time.Duration, headers map[string]string) Request {
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodPost, u, nil)
 	req.ProtoMajor = 1
 	req.ProtoMinor = 1
 	req.TransferEncoding = []string{"chunked"}
 	req.Header = make(map[string][]string)
+
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 
 	return &request{
 		client:      http.DefaultClient,
